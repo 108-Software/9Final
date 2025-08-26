@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -18,11 +17,10 @@ func generateRandomElements(size int) []int {
 		return []int{}
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	slice := make([]int, size)
 
 	for i := 0; i < size; i++ {
-		slice[i] = rand.Intn(1000) 
+		slice[i] = rand.Int() 
 	}
 
 	return slice
@@ -33,7 +31,7 @@ func maximum(data []int) int {
 		return 0
 	}
 
-	maxValue := math.MinInt
+	maxValue := 0
 	for _, value := range data {
 		if value > maxValue {
 			maxValue = value
@@ -55,7 +53,6 @@ func maxChunks(data []int) int {
 	chunkSize := len(data) / CHUNKS
 	maxValues := make([]int, CHUNKS)
 	var waitGroup sync.WaitGroup
-	var mutex sync.Mutex
 
 	for i := 0; i < CHUNKS; i++ {
 		waitGroup.Add(1)
@@ -66,32 +63,18 @@ func maxChunks(data []int) int {
 			endIndex = len(data)
 		}
 
-		go func(chunkIndex, startIdx, endIdx int) {
+		chunk := data[startIndex:endIndex]
+		
+		go func(chunkIndex int, chunkData []int) {
 			defer waitGroup.Done()
-
-			chunkMax := data[startIdx]
-			for j := startIdx + 1; j < endIdx; j++ {
-				if data[j] > chunkMax {
-					chunkMax = data[j]
-				}
-			}
-
-			mutex.Lock()
-			maxValues[chunkIndex] = chunkMax
-			mutex.Unlock()
-		}(i, startIndex, endIndex)
+			
+			maxValues[chunkIndex] = maximum(chunkData)
+		}(i, chunk)
 	}
 
 	waitGroup.Wait()
 
-	finalMax := maxValues[0]
-	for _, value := range maxValues[1:] {
-		if value > finalMax {
-			finalMax = value
-		}
-	}
-
-	return finalMax
+	return maximum(maxValues)
 }
 
 func main() {

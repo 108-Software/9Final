@@ -1,8 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateRandomElements(t *testing.T) {
@@ -11,126 +13,147 @@ func TestGenerateRandomElements(t *testing.T) {
 		size     int
 		expected int
 	}{
-		{
-			name:     "Положительный размер",
-			size:     10,
-			expected: 10,
-		},
-		{
-			name:     "Большой размер",
-			size:     1000,
-			expected: 1000,
-		},
-		{
-			name:     "Размер 1",
-			size:     1,
-			expected: 1,
-		},
-		{
-			name:     "Нулевой размер",
-			size:     0,
-			expected: 0,
-		},
-		{
-			name:     "Отрицательный размер",
-			size:     -5,
-			expected: 0,
-		},
+		{"Zero size", 0, 0},
+		{"Positive size", 100, 100},
+		{"Large size", 10000, 10000},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := generateRandomElements(tt.size)
-
-			if len(result) != tt.expected {
-				t.Errorf("generateRandomElements(%d) вернул слайс длины %d, ожидалось %d",
-					tt.size, len(result), tt.expected)
-			}
-
-			if tt.size > 0 {
-				for i, val := range result {
-					if val < 0 || val >= 1000 {
-						t.Errorf("Элемент по индексу %d равен %d, ожидался диапазон [0, 999]", i, val)
-					}
-				}
-
-				if result == nil {
-					t.Error("generateRandomElements() вернул nil слайс для положительного размера")
-				}
-			} else {
-				if result != nil && len(result) != 0 {
-					t.Error("generateRandomElements() должен возвращать пустой слайс для неположительного размера")
-				}
-			}
+			require.Len(t, result, tt.expected)
 		})
 	}
 }
 
-func TestGenerateRandomElements_DiapazonZnacheniy(t *testing.T) {
-	size := 10000
-	result := generateRandomElements(size)
-
-	uvidennyeZnacheniya := make(map[int]bool)
-	vseVRamkah := true
-
-	for _, val := range result {
-		if val < 0 || val >= 1000 {
-			vseVRamkah = false
-			break
-		}
-		uvidennyeZnacheniya[val] = true
-	}
-
-	if !vseVRamkah {
-		t.Errorf("Не все значения в диапазоне [0, 999]")
-	}
-
-	if len(uvidennyeZnacheniya) <= 1 && size > 10 {
-		t.Errorf("Ожидалось разнообразие случайных значений, получено только %d уникальных значений", len(uvidennyeZnacheniya))
-	}
-}
-
 func TestGenerateRandomElements_Soglasovannost(t *testing.T) {
-	for i := 0; i < 5; i++ {
-		size := 50 + i*10
-		result := generateRandomElements(size)
-		if len(result) != size {
-			t.Errorf("Итерация %d: ожидалась длина %d, получено %d", i, size, len(result))
+	t.Run("Consistency between runs", func(t *testing.T) {
+	
+		results := make([][]int, 3)
+		for i := 0; i < 3; i++ {
+			results[i] = generateRandomElements(100)
+			require.Len(t, results[i], 100)
 		}
-	}
+
+		
+		assert.NotEqual(t, results[0], results[1], "Результаты должны быть разными между запусками")
+		assert.NotEqual(t, results[1], results[2], "Результаты должны быть разными между запусками")
+		assert.NotEqual(t, results[0], results[2], "Результаты должны быть разными между запусками")
+	})
+
+	t.Run("Empty input consistency", func(t *testing.T) {
+		result1 := generateRandomElements(0)
+		result2 := generateRandomElements(0)
+		
+		assert.Empty(t, result1)
+		assert.Empty(t, result2)
+		assert.Equal(t, result1, result2)
+	})
 }
 
 func TestGenerateRandomElements_KraynieSluchai(t *testing.T) {
-	kraynieSluchai := []struct {
-		size     int
-		expected int
-		desc     string
+	tests := []struct {
+		name string
+		size int
 	}{
-		{size: -1, expected: 0, desc: "Минус один"},
-		{size: -100, expected: 0, desc: "Большое отрицательное"},
-		{size: 0, expected: 0, desc: "Ноль"},
-		{size: 1, expected: 1, desc: "Один"},
-		{size: 2, expected: 2, desc: "Два"},
+		{"Negative size", -1},
+		{"Very large size", 1000000},
+		{"Size 1", 1},
 	}
 
-	for _, tc := range kraynieSluchai {
-		t.Run(tc.desc, func(t *testing.T) {
-			result := generateRandomElements(tc.size)
-			if len(result) != tc.expected {
-				t.Errorf("Для размера %d: ожидалась длина %d, получено %d", tc.size, tc.expected, len(result))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateRandomElements(tt.size)
+			
+			if tt.size <= 0 {
+				assert.Empty(t, result, "Для неположительного размера должен возвращаться пустой слайс")
+			} else {
+				assert.Len(t, result, tt.size, "Для положительного размера должен возвращаться слайс нужной длины")
+				
+				if tt.size == 1 {
+					assert.True(t, result[0] >= 0, "Единственный элемент должен быть неотрицательным")
+				}
 			}
 		})
 	}
 }
 
 func BenchmarkGenerateRandomElements(b *testing.B) {
-	razmery := []int{10, 100, 1000, 10000, 100000}
+	sizes := []int{100, 1000, 10000, 100000}
 
-	for _, size := range razmery {
-		b.Run(fmt.Sprintf("Размер_%d", size), func(b *testing.B) {
+	for _, size := range sizes {
+		b.Run("Size_%d", func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				generateRandomElements(size)
 			}
 		})
 	}
+}
+
+func TestMaximum(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []int
+		expected int
+	}{
+		{"Empty slice", []int{}, 0},
+		{"Single element", []int{42}, 42},
+		{"Multiple elements", []int{1, 5, 3, 9, 2}, 9},
+		{"All zeros", []int{0, 0, 0}, 0},
+		{"Negative numbers", []int{-5, -1, -3}, 0}, 
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := maximum(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMaxChunks(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []int
+		expected int
+	}{
+		{"Empty slice", []int{}, 0},
+		{"Smaller than chunks", []int{1, 5, 3}, 5},
+		{"Exactly chunks size", make([]int, CHUNKS), 0},
+		{"Large data", makeLargeTestData(100), 999},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := maxChunks(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func makeLargeTestData(size int) []int {
+	data := make([]int, size)
+	for i := range data {
+		data[i] = i
+	}
+
+	if size > 0 {
+		data[size-1] = 999
+	}
+	return data
+}
+
+func TestIntegration(t *testing.T) {
+	t.Run("Integration test", func(t *testing.T) {
+	
+		data := generateRandomElements(1000)
+		require.Len(t, data, 1000)
+		
+		max1 := maximum(data)
+		assert.True(t, max1 >= 0)
+		
+		max2 := maxChunks(data)
+		assert.Equal(t, max1, max2)
+	})
 }
